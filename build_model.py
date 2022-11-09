@@ -50,7 +50,7 @@ rlp_patience = 4
 callback=tf.keras.callbacks.ReduceLROnPlateau(monitor='val_root_mean_squared_error', patience=rlp_patience,  
                                                mode='min', factor=rlp_factor)
 
-kcnn = build_deconv() #[32,32,32,16]
+kcnn = build_deconv() 
 kcnn.compile(loss=keras.losses.mse,optimizer = keras.optimizers.Adam(0.001, beta_1=0.9),\
          metrics=tf.keras.metrics.RootMeanSquaredError()) 
 ### for training 
@@ -60,35 +60,17 @@ scra_hist = kcnn.fit(train_sets, train_y,
                         verbose=0,
                     workers=12,validation_data=(val_set, val_y), 
                     callbacks=[callback, early_stop],)
+## plot the training and validation loss 
+loss = scra_hist.history["root_mean_squared_error"] 
+val_loss = scra_hist.history["val_root_mean_squared_error"]
+plt.figure(figsize=(3,3))
+plt.plot(loss, label="Train loss")
+plt.plot(val_loss, label="Val loss")
+plt.legend(loc="upper right")
+plt.ylabel("loss")
+plt.ylim([min(plt.ylim()), 0.05])
+plt.title("Train and Val loss")
+plt.xlabel("epoch")
+plt.show()
 
-
-### traing in simulated data; then fine-tune using real mixed samples
-
-callback_ft=tf.keras.callbacks.ReduceLROnPlateau(monitor='loss', patience=3,  
-                                               mode='min', factor=0.98)
-finetune_models = {}
-for i in range(5):
-    tmp_md = scrath_models[i]
-    tmp_finet = cnn_scratch(Input((60,30,1)))
-    tmp_finet.set_weights(tmp_md.get_weights())
-    for l in tmp_finet._layers[:10]:
-        l.trainable=False
-    for l in tmp_finet._layers[10:]:
-        l.trainable=True
-
-    tmp_finet.compile(optimizer=Adam(lr=0.0009), ## better than beta_1=0.9
-                     loss=[tf.keras.losses.MeanSquaredError()],#, tf.keras.losses.MeanSquaredError()
-                      # tf.keras.losses.LogCosh(reduction=tf.keras.losses.Reduction.SUM)
-                      metrics=[tf.keras.metrics.RootMeanSquaredError()])
-
-    hist2 = tmp_finet.fit(real_tr_sets_gp1,real_tr_y_gp1, 
-                        shuffle=True, epochs=216, #296,
-#                         validation_data=(real_val_set_gp1,real_val_y_gp1),
-                        use_multiprocessing=True,
-                        workers=22, verbose=0,
-                        callbacks=[callback_ft],
-                       )
-    finetune_models[i] = tmp_finet
-
-
-
+kcnn.save("./model/trained_model.h5",save_format='h5')
